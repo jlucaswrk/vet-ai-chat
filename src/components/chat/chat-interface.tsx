@@ -74,11 +74,7 @@ export function ChatInterface({
   };
 
   const ALLOWED_EXTENSIONS = ['.pdf', '.pptx', '.ppt', '.docx', '.doc'];
-  const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB - DigitalOcean Spaces (praticamente ilimitado)
-  const VERCEL_SIZE_LIMIT = 4 * 1024 * 1024; // 4MB - Use Spaces for larger files
-
-  // Check if Spaces is configured
-  const useSpaces = process.env.NEXT_PUBLIC_USE_SPACES === 'true';
+  const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB - DigitalOcean Spaces
 
   const isAllowedFile = (filename: string): boolean => {
     const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
@@ -110,12 +106,9 @@ export function ChatInterface({
         return;
       }
 
-      // Check file size limits
-      const effectiveMaxSize = useSpaces ? MAX_FILE_SIZE : VERCEL_SIZE_LIMIT;
-
-      if (file.size > effectiveMaxSize) {
-        const maxSizeMB = useSpaces ? '500MB' : '4MB';
-        setUploadError(`Arquivo muito grande (${formatFileSize(file.size)}). Máximo: ${maxSizeMB}`);
+      // Check file size limit (500MB via Spaces)
+      if (file.size > MAX_FILE_SIZE) {
+        setUploadError(`Arquivo muito grande (${formatFileSize(file.size)}). Máximo: 500MB`);
         return;
       }
 
@@ -124,103 +117,66 @@ export function ChatInterface({
       setUploadError(null);
 
       try {
-        // Use Spaces for large files or when configured
-        const shouldUseSpaces = useSpaces && file.size > VERCEL_SIZE_LIMIT;
+        // Step 1: Get presigned upload URL from Spaces
+        setUploadProgress(10);
+        const urlResponse = await fetch('/api/spaces/upload-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filename: file.name,
+            contentType: getMimeType(file.name),
+          }),
+        });
 
-        if (shouldUseSpaces) {
-          // Step 1: Get presigned upload URL
-          setUploadProgress(10);
-          const urlResponse = await fetch('/api/spaces/upload-url', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              filename: file.name,
-              contentType: getMimeType(file.name),
-            }),
-          });
-
-          if (!urlResponse.ok) {
-            const urlData = await urlResponse.json();
-            throw new Error(urlData.error || 'Erro ao obter URL de upload');
-          }
-
-          const { uploadUrl, fileKey } = await urlResponse.json();
-          setUploadProgress(20);
-
-          // Step 2: Upload directly to Spaces
-          const uploadResponse = await fetch(uploadUrl, {
-            method: 'PUT',
-            body: file,
-            headers: {
-              'Content-Type': getMimeType(file.name),
-            },
-          });
-
-          if (!uploadResponse.ok) {
-            throw new Error('Erro ao fazer upload para o storage');
-          }
-
-          setUploadProgress(60);
-
-          // Step 3: Process the file
-          const processResponse = await fetch('/api/spaces/process', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              fileKey,
-              filename: file.name,
-            }),
-          });
-
-          const processData = await processResponse.json();
-
-          if (!processResponse.ok) {
-            throw new Error(processData.error || 'Erro ao processar arquivo');
-          }
-
-          setUploadProgress(100);
-
-          const newDocument: PDFDocument = {
-            id: crypto.randomUUID(),
-            name: processData.name,
-            content: processData.content,
-            uploadedAt: new Date(),
-          };
-
-          onDocumentsChange([...documents, newDocument]);
-        } else {
-          // Use local Vercel API for small files
-          const progressInterval = setInterval(() => {
-            setUploadProgress((prev) => Math.min(prev + 10, 90));
-          }, 100);
-
-          const formData = new FormData();
-          formData.append("file", file);
-
-          const response = await fetch("/api/upload", {
-            method: "POST",
-            body: formData,
-          });
-
-          clearInterval(progressInterval);
-
-          const data = await response.json();
-
-          if (!response.ok) {
-            throw new Error(data.error || "Erro ao fazer upload");
-          }
-
-          setUploadProgress(100);
-
-          const newDocument: PDFDocument = {
-            id: crypto.randomUUID(),
-            name: data.name,
-            content: data.content,
-            uploadedAt: new Date(),
-          };
-
-          onDocumentsChange([...documents, newDocument]);
+        if (!urlResponse.ok) {
+          const urlData = await urlResponse.json();
+          throw new Error(urlData.error || 'Erro ao obter URL de upload');
         }
+
+        const { uploadUrl, fileKey } = await urlResponse.json();
+        setUploadProgress(20);
+
+        // Step 2: Upload directly to DigitalOcean Spaces
+        const uploadResponse = await fetch(uploadUrl, {
+          method: 'PUT',
+          body: file,
+          headers: {
+            'Content-Type': getMimeType(file.name),
+          },
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error('Erro ao fazer upload para o storage');
+        }
+
+        setUploadProgress(60);
+
+        // Step 3: Process the file (extract text)
+        const processResponse = await fetch('/api/spaces/process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileKey,
+            filename: file.name,
+          }),
+        });
+
+        const processData = await processResponse.json();
+
+        if (!processResponse.ok) {
+          throw new Error(processData.error || 'Erro ao processar arquivo');
+        }
+
+        setUploadProgress(100);
+
+        const newDocument: PDFDocument = {
+          id: crypto.randomUUID(),
+          name: processData.name,
+          content: processData.content,
+          uploadedAt: new Date(),
+        };
+
+        onDocumentsChange([...documents, newDocument]);
 
         setTimeout(() => {
           setUploadProgress(0);
@@ -233,7 +189,7 @@ export function ChatInterface({
         setIsUploading(false);
       }
     },
-    [documents, onDocumentsChange, useSpaces]
+    [documents, onDocumentsChange]
   );
 
   const onDrop = useCallback(
