@@ -9,7 +9,7 @@ Uma aplicação de chat com IA que responde perguntas veterinárias baseadas em 
 - **Respostas Contextuais**: A IA responde baseada no material carregado
 - **Interface Responsiva**: Funciona em desktop e mobile (mobile-first)
 - **Modo Escuro/Claro**: Tema adaptável às suas preferências
-- **Arquivos Grandes**: Suporte a arquivos até 50MB via DigitalOcean
+- **Arquivos Grandes**: Suporte a arquivos de qualquer tamanho via DigitalOcean Spaces
 
 ## Tecnologias
 
@@ -19,7 +19,8 @@ Uma aplicação de chat com IA que responde perguntas veterinárias baseadas em 
 - **Shadcn/ui** - Componentes de UI
 - **OpenAI GPT-4o-mini** - Modelo de IA
 - **officeparser** - Extração de texto de PDF, PPTX, DOCX
-- **DigitalOcean App Platform** - Processamento de arquivos grandes
+- **DigitalOcean Spaces** - Object Storage para arquivos grandes
+- **AWS SDK S3** - Client para upload direto ao Spaces
 
 ## Instalação Local
 
@@ -54,16 +55,71 @@ Você pode obter sua API key da OpenAI em:
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/jlucaswrk/vet-ai-chat)
 
-## Deploy do File Processor (DigitalOcean) - Para arquivos > 4MB
+## Configuração do DigitalOcean Spaces (para arquivos > 4MB)
 
-1. Acesse https://cloud.digitalocean.com/apps/new
-2. Conecte o repositório `jlucaswrk/vet-file-processor`
-3. Mantenha as configurações padrão (Node.js será detectado)
-4. Após deploy, copie a URL gerada (ex: `https://vet-file-processor-xxxxx.ondigitalocean.app`)
-5. No Vercel, adicione a variável de ambiente:
-   ```
-   NEXT_PUBLIC_FILE_PROCESSOR_URL=https://sua-url.ondigitalocean.app
-   ```
+Para suportar arquivos grandes, o app usa DigitalOcean Spaces (Object Storage):
+
+### 1. Criar um Spaces Bucket
+```bash
+# Via doctl CLI
+doctl spaces keys create vet-ai-files --grants "bucket=;permission=fullaccess"
+s3cmd mb s3://vet-ai-files
+```
+
+### 2. Configurar CORS no Bucket
+Crie um arquivo `cors.xml`:
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<CORSConfiguration>
+  <CORSRule>
+    <AllowedOrigin>https://vet-ai-chat.vercel.app</AllowedOrigin>
+    <AllowedOrigin>http://localhost:3000</AllowedOrigin>
+    <AllowedMethod>GET</AllowedMethod>
+    <AllowedMethod>PUT</AllowedMethod>
+    <AllowedMethod>POST</AllowedMethod>
+    <AllowedHeader>*</AllowedHeader>
+  </CORSRule>
+</CORSConfiguration>
+```
+```bash
+s3cmd setcors cors.xml s3://vet-ai-files
+```
+
+### 3. Adicionar variáveis de ambiente no Vercel
+```
+NEXT_PUBLIC_USE_SPACES=true
+DO_SPACES_KEY=sua-access-key
+DO_SPACES_SECRET=sua-secret-key
+DO_SPACES_BUCKET=vet-ai-files
+DO_SPACES_REGION=nyc3
+```
+
+## Arquitetura
+
+```
+┌─────────────┐     < 4MB      ┌──────────────┐
+│   Browser   │ ──────────────>│ Vercel API   │
+└─────────────┘                └──────────────┘
+       │
+       │ > 4MB
+       v
+┌─────────────┐  presigned URL  ┌──────────────┐
+│   Browser   │ <──────────────│ Vercel API   │
+└─────────────┘                └──────────────┘
+       │
+       │ PUT file
+       v
+┌─────────────────────────────────────────────┐
+│         DigitalOcean Spaces (S3)            │
+│         vet-ai-files.nyc3.digitaloceanspaces.com │
+└─────────────────────────────────────────────┘
+       │
+       │ process
+       v
+┌─────────────┐  extract text   ┌──────────────┐
+│   Browser   │ <──────────────│ Vercel API   │
+└─────────────┘                └──────────────┘
+```
 
 ## Licença
 
