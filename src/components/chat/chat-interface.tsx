@@ -74,11 +74,11 @@ export function ChatInterface({
   };
 
   const ALLOWED_EXTENSIONS = ['.pdf', '.pptx', '.ppt', '.docx', '.doc'];
-  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB - DigitalOcean limit
-  const VERCEL_SIZE_LIMIT = 4 * 1024 * 1024; // 4MB - Use DO for larger files
+  const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB - DigitalOcean Spaces (praticamente ilimitado)
+  const VERCEL_SIZE_LIMIT = 4 * 1024 * 1024; // 4MB - Use Spaces for larger files
 
-  // DigitalOcean App Platform URL - will be updated after deployment
-  const FILE_PROCESSOR_URL = process.env.NEXT_PUBLIC_FILE_PROCESSOR_URL || '';
+  // Check if Spaces is configured
+  const useSpaces = process.env.NEXT_PUBLIC_USE_SPACES === 'true';
 
   const isAllowedFile = (filename: string): boolean => {
     const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
@@ -91,6 +91,18 @@ export function ChatInterface({
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
+  const getMimeType = (filename: string): string => {
+    const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
+    const mimeTypes: Record<string, string> = {
+      '.pdf': 'application/pdf',
+      '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      '.ppt': 'application/vnd.ms-powerpoint',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.doc': 'application/msword',
+    };
+    return mimeTypes[ext] || 'application/octet-stream';
+  };
+
   const handleFileUpload = useCallback(
     async (file: File) => {
       if (!isAllowedFile(file.name)) {
@@ -98,12 +110,11 @@ export function ChatInterface({
         return;
       }
 
-      // Check file size limits based on available services
-      const hasExternalProcessor = !!FILE_PROCESSOR_URL;
-      const effectiveMaxSize = hasExternalProcessor ? MAX_FILE_SIZE : VERCEL_SIZE_LIMIT;
+      // Check file size limits
+      const effectiveMaxSize = useSpaces ? MAX_FILE_SIZE : VERCEL_SIZE_LIMIT;
 
       if (file.size > effectiveMaxSize) {
-        const maxSizeMB = hasExternalProcessor ? '50MB' : '4MB';
+        const maxSizeMB = useSpaces ? '500MB' : '4MB';
         setUploadError(`Arquivo muito grande (${formatFileSize(file.size)}). Máximo: ${maxSizeMB}`);
         return;
       }
@@ -113,42 +124,103 @@ export function ChatInterface({
       setUploadError(null);
 
       try {
-        const progressInterval = setInterval(() => {
-          setUploadProgress((prev) => Math.min(prev + 10, 90));
-        }, 100);
+        // Use Spaces for large files or when configured
+        const shouldUseSpaces = useSpaces && file.size > VERCEL_SIZE_LIMIT;
 
-        const formData = new FormData();
-        formData.append("file", file);
+        if (shouldUseSpaces) {
+          // Step 1: Get presigned upload URL
+          setUploadProgress(10);
+          const urlResponse = await fetch('/api/spaces/upload-url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              filename: file.name,
+              contentType: getMimeType(file.name),
+            }),
+          });
 
-        // Use DigitalOcean for large files, Vercel for small files
-        const useDigitalOcean = file.size > VERCEL_SIZE_LIMIT && FILE_PROCESSOR_URL;
-        const uploadUrl = useDigitalOcean
-          ? `${FILE_PROCESSOR_URL}/process`
-          : "/api/upload";
+          if (!urlResponse.ok) {
+            const urlData = await urlResponse.json();
+            throw new Error(urlData.error || 'Erro ao obter URL de upload');
+          }
 
-        const response = await fetch(uploadUrl, {
-          method: "POST",
-          body: formData,
-        });
+          const { uploadUrl, fileKey } = await urlResponse.json();
+          setUploadProgress(20);
 
-        clearInterval(progressInterval);
+          // Step 2: Upload directly to Spaces
+          const uploadResponse = await fetch(uploadUrl, {
+            method: 'PUT',
+            body: file,
+            headers: {
+              'Content-Type': getMimeType(file.name),
+            },
+          });
 
-        const data = await response.json();
+          if (!uploadResponse.ok) {
+            throw new Error('Erro ao fazer upload para o storage');
+          }
 
-        if (!response.ok) {
-          throw new Error(data.error || "Erro ao fazer upload");
+          setUploadProgress(60);
+
+          // Step 3: Process the file
+          const processResponse = await fetch('/api/spaces/process', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fileKey,
+              filename: file.name,
+            }),
+          });
+
+          const processData = await processResponse.json();
+
+          if (!processResponse.ok) {
+            throw new Error(processData.error || 'Erro ao processar arquivo');
+          }
+
+          setUploadProgress(100);
+
+          const newDocument: PDFDocument = {
+            id: crypto.randomUUID(),
+            name: processData.name,
+            content: processData.content,
+            uploadedAt: new Date(),
+          };
+
+          onDocumentsChange([...documents, newDocument]);
+        } else {
+          // Use local Vercel API for small files
+          const progressInterval = setInterval(() => {
+            setUploadProgress((prev) => Math.min(prev + 10, 90));
+          }, 100);
+
+          const formData = new FormData();
+          formData.append("file", file);
+
+          const response = await fetch("/api/upload", {
+            method: "POST",
+            body: formData,
+          });
+
+          clearInterval(progressInterval);
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || "Erro ao fazer upload");
+          }
+
+          setUploadProgress(100);
+
+          const newDocument: PDFDocument = {
+            id: crypto.randomUUID(),
+            name: data.name,
+            content: data.content,
+            uploadedAt: new Date(),
+          };
+
+          onDocumentsChange([...documents, newDocument]);
         }
-
-        setUploadProgress(100);
-
-        const newDocument: PDFDocument = {
-          id: crypto.randomUUID(),
-          name: data.name,
-          content: data.content,
-          uploadedAt: new Date(),
-        };
-
-        onDocumentsChange([...documents, newDocument]);
 
         setTimeout(() => {
           setUploadProgress(0);
@@ -161,7 +233,7 @@ export function ChatInterface({
         setIsUploading(false);
       }
     },
-    [documents, onDocumentsChange]
+    [documents, onDocumentsChange, useSpaces]
   );
 
   const onDrop = useCallback(
