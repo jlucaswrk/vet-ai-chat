@@ -73,10 +73,17 @@ export function ChatInterface({
     return documents.map((doc) => `[${doc.name}]\n${doc.content}`).join("\n\n---\n\n");
   };
 
+  const ALLOWED_EXTENSIONS = ['.pdf', '.pptx', '.ppt', '.docx', '.doc'];
+
+  const isAllowedFile = (filename: string): boolean => {
+    const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
+    return ALLOWED_EXTENSIONS.includes(ext);
+  };
+
   const handleFileUpload = useCallback(
     async (file: File) => {
-      if (!file.name.toLowerCase().endsWith('.pdf')) {
-        setUploadError('Apenas arquivos PDF são aceitos');
+      if (!isAllowedFile(file.name)) {
+        setUploadError('Use: PDF, PowerPoint ou Word');
         return;
       }
 
@@ -142,6 +149,10 @@ export function ChatInterface({
     onDrop,
     accept: {
       "application/pdf": [".pdf"],
+      "application/vnd.ms-powerpoint": [".ppt"],
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation": [".pptx"],
+      "application/msword": [".doc"],
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
     },
     maxFiles: 1,
     noClick: true,
@@ -254,7 +265,7 @@ export function ChatInterface({
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf"
+        accept=".pdf,.pptx,.ppt,.docx,.doc"
         onChange={handleFileChange}
         className="hidden"
       />
@@ -264,9 +275,9 @@ export function ChatInterface({
         <div className="absolute inset-0 z-50 bg-primary/10 backdrop-blur-sm flex items-center justify-center">
           <div className="bg-card p-8 rounded-2xl shadow-2xl border-2 border-dashed border-primary">
             <Upload className="w-16 h-16 text-primary mx-auto mb-4" />
-            <p className="text-lg font-semibold text-center">Solte o PDF aqui</p>
+            <p className="text-lg font-semibold text-center">Solte o arquivo aqui</p>
             <p className="text-sm text-muted-foreground text-center mt-1">
-              O arquivo será processado automaticamente
+              PDF, PowerPoint ou Word
             </p>
           </div>
         </div>
@@ -285,7 +296,7 @@ export function ChatInterface({
           <SheetTrigger asChild>
             <Button variant="outline" size="sm" className="gap-2 h-9">
               <FileText className="w-4 h-4" />
-              <span className="text-xs">{documents.length} PDF{documents.length !== 1 ? 's' : ''}</span>
+              <span className="text-xs">{documents.length} arquivo{documents.length !== 1 ? 's' : ''}</span>
               <ChevronRight className="w-3 h-3" />
             </Button>
           </SheetTrigger>
@@ -311,8 +322,8 @@ export function ChatInterface({
               ) : (
                 <>
                   <Upload className="w-6 h-6 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-sm font-medium">Adicionar PDF</p>
-                  <p className="text-xs text-muted-foreground">Toque para selecionar</p>
+                  <p className="text-sm font-medium">Adicionar arquivo</p>
+                  <p className="text-xs text-muted-foreground">PDF, PowerPoint ou Word</p>
                 </>
               )}
             </div>
@@ -401,7 +412,7 @@ export function ChatInterface({
                   {isUploading ? (
                     <div className="space-y-3">
                       <Loader2 className="w-10 h-10 mx-auto text-primary animate-spin" />
-                      <p className="text-sm font-medium">Processando PDF...</p>
+                      <p className="text-sm font-medium">Processando arquivo...</p>
                       <Progress value={uploadProgress} className="h-1.5" />
                     </div>
                   ) : (
@@ -409,9 +420,9 @@ export function ChatInterface({
                       <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-primary/20 to-emerald-500/20 flex items-center justify-center mb-3">
                         <Upload className="w-7 h-7 text-primary" />
                       </div>
-                      <p className="font-semibold mb-1">Comece enviando um PDF</p>
+                      <p className="font-semibold mb-1">Envie seus slides ou documentos</p>
                       <p className="text-sm text-muted-foreground">
-                        Toque aqui ou arraste um arquivo
+                        PDF, PowerPoint ou Word
                       </p>
                     </>
                   )}
@@ -424,7 +435,7 @@ export function ChatInterface({
                     </div>
                     <div className="flex-1">
                       <p className="font-semibold text-emerald-700 dark:text-emerald-400 text-sm">
-                        {documents.length} PDF{documents.length > 1 ? 's' : ''} carregado{documents.length > 1 ? 's' : ''}
+                        {documents.length} arquivo{documents.length > 1 ? 's' : ''} carregado{documents.length > 1 ? 's' : ''}
                       </p>
                       <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70">
                         Pronto para responder!
@@ -570,7 +581,7 @@ export function ChatInterface({
           {isUploading && (
             <div className="mb-2 p-2 rounded-lg bg-primary/10 flex items-center gap-2">
               <Loader2 className="w-4 h-4 text-primary animate-spin" />
-              <span className="text-xs text-primary flex-1">Processando PDF...</span>
+              <span className="text-xs text-primary flex-1">Processando arquivo...</span>
               <Progress value={uploadProgress} className="w-20 h-1" />
             </div>
           )}
@@ -598,7 +609,7 @@ export function ChatInterface({
                 placeholder={
                   documents.length > 0
                     ? "Pergunte sobre o material..."
-                    : "Envie um PDF para começar..."
+                    : "Envie um arquivo para começar..."
                 }
                 className="min-h-[44px] md:min-h-[48px] max-h-[120px] resize-none rounded-xl bg-background shadow-sm border-2 focus:border-primary transition-colors text-sm"
                 disabled={isLoading}

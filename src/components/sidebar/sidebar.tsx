@@ -126,6 +126,10 @@ export function Sidebar({
     onDrop,
     accept: {
       "application/pdf": [".pdf"],
+      "application/vnd.ms-powerpoint": [".ppt"],
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation": [".pptx"],
+      "application/msword": [".doc"],
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
     },
     maxFiles: 1,
     disabled: isUploading,
@@ -263,7 +267,7 @@ export function Sidebar({
                   <Loader2 className="w-7 h-7 text-primary animate-spin" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium">Processando PDF...</p>
+                  <p className="text-sm font-medium">Processando...</p>
                   <p className="text-xs text-muted-foreground mt-1">Extraindo conteúdo</p>
                 </div>
                 <Progress value={uploadProgress} className="h-1.5" />
@@ -275,10 +279,10 @@ export function Sidebar({
                 </div>
                 <div>
                   <p className="text-sm font-medium">
-                    {isDragActive ? "Solte o arquivo aqui" : "Upload de PDF"}
+                    {isDragActive ? "Solte o arquivo aqui" : "Upload de arquivo"}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Arraste ou clique para selecionar
+                    PDF, PowerPoint ou Word
                   </p>
                 </div>
               </div>
