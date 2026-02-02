@@ -1,11 +1,20 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import {
   Send,
   Bot,
@@ -19,6 +28,12 @@ import {
   BookOpen,
   Heart,
   PawPrint,
+  Paperclip,
+  X,
+  Upload,
+  Trash2,
+  ChevronRight,
+  CheckCircle2,
 } from "lucide-react";
 import { Message, PDFDocument } from "@/lib/types";
 
@@ -26,19 +41,26 @@ interface ChatInterfaceProps {
   apiKey: string | null;
   documents: PDFDocument[];
   onNeedApiKey: () => void;
+  onDocumentsChange: (docs: PDFDocument[]) => void;
 }
 
 export function ChatInterface({
   apiKey,
   documents,
   onNeedApiKey,
+  onDocumentsChange,
 }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [showDocuments, setShowDocuments] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -49,6 +71,100 @@ export function ChatInterface({
   const getContext = () => {
     if (documents.length === 0) return null;
     return documents.map((doc) => `[${doc.name}]\n${doc.content}`).join("\n\n---\n\n");
+  };
+
+  const handleFileUpload = useCallback(
+    async (file: File) => {
+      if (!file.name.toLowerCase().endsWith('.pdf')) {
+        setUploadError('Apenas arquivos PDF são aceitos');
+        return;
+      }
+
+      setIsUploading(true);
+      setUploadProgress(0);
+      setUploadError(null);
+
+      try {
+        const progressInterval = setInterval(() => {
+          setUploadProgress((prev) => Math.min(prev + 10, 90));
+        }, 100);
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        clearInterval(progressInterval);
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Erro ao fazer upload");
+        }
+
+        setUploadProgress(100);
+
+        const newDocument: PDFDocument = {
+          id: crypto.randomUUID(),
+          name: data.name,
+          content: data.content,
+          uploadedAt: new Date(),
+        };
+
+        onDocumentsChange([...documents, newDocument]);
+
+        setTimeout(() => {
+          setUploadProgress(0);
+          setIsUploading(false);
+        }, 500);
+      } catch (error) {
+        setUploadError(
+          error instanceof Error ? error.message : "Erro desconhecido"
+        );
+        setIsUploading(false);
+      }
+    },
+    [documents, onDocumentsChange]
+  );
+
+  const onDrop = useCallback(
+    async (acceptedFiles: File[]) => {
+      if (acceptedFiles.length === 0) return;
+      handleFileUpload(acceptedFiles[0]);
+    },
+    [handleFileUpload]
+  );
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      "application/pdf": [".pdf"],
+    },
+    maxFiles: 1,
+    noClick: true,
+    noKeyboard: true,
+  });
+
+  const handleAttachClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileUpload(file);
+    }
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeDocument = (id: string) => {
+    onDocumentsChange(documents.filter((doc) => doc.id !== id));
   };
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -118,113 +234,250 @@ export function ChatInterface({
   };
 
   const suggestedQuestions = [
-    { icon: FileText, text: "Quais são os principais sintomas discutidos?" },
-    { icon: Heart, text: "Explique os tratamentos mencionados" },
-    { icon: BookOpen, text: "Resuma os pontos principais" },
-    { icon: PawPrint, text: "Quais doenças são abordadas?" },
+    { icon: FileText, text: "Principais sintomas discutidos?" },
+    { icon: Heart, text: "Tratamentos mencionados" },
+    { icon: BookOpen, text: "Resuma o conteúdo" },
+    { icon: PawPrint, text: "Doenças abordadas" },
   ];
 
   const features = [
-    { icon: Zap, title: "Respostas Rápidas", description: "Análise instantânea do conteúdo" },
-    { icon: BookOpen, title: "Base em PDFs", description: "Respostas baseadas no seu material" },
-    { icon: MessageSquare, title: "Conversas", description: "Tire dúvidas de forma natural" },
+    { icon: Zap, title: "Respostas Rápidas", description: "Análise instantânea" },
+    { icon: BookOpen, title: "Base em PDFs", description: "Seu material" },
+    { icon: MessageSquare, title: "Chat Natural", description: "Tire dúvidas" },
   ];
 
   return (
-    <div className="flex flex-col h-full bg-mesh">
-      {/* Chat Messages */}
-      <ScrollArea className="flex-1 p-4 md:p-6" ref={scrollRef}>
-        <div className="max-w-3xl mx-auto space-y-6">
-          {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 md:py-16 text-center px-4">
-              {/* Hero Icon */}
-              <div className="relative mb-8">
-                <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary via-emerald-500 to-cyan-500 flex items-center justify-center shadow-2xl shadow-primary/30">
-                  <Bot className="w-12 h-12 text-white" />
+    <div {...getRootProps()} className="flex flex-col h-full bg-mesh relative">
+      <input {...getInputProps()} />
+
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+
+      {/* Drag overlay */}
+      {isDragActive && (
+        <div className="absolute inset-0 z-50 bg-primary/10 backdrop-blur-sm flex items-center justify-center">
+          <div className="bg-card p-8 rounded-2xl shadow-2xl border-2 border-dashed border-primary">
+            <Upload className="w-16 h-16 text-primary mx-auto mb-4" />
+            <p className="text-lg font-semibold text-center">Solte o PDF aqui</p>
+            <p className="text-sm text-muted-foreground text-center mt-1">
+              O arquivo será processado automaticamente
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Header - Documents indicator (mobile) */}
+      <div className="flex items-center justify-between p-3 border-b bg-card/50 backdrop-blur-sm md:hidden">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-emerald-600 flex items-center justify-center">
+            <Bot className="w-4 h-4 text-white" />
+          </div>
+          <span className="font-semibold text-sm">VetAI</span>
+        </div>
+
+        <Sheet open={showDocuments} onOpenChange={setShowDocuments}>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2 h-9">
+              <FileText className="w-4 h-4" />
+              <span className="text-xs">{documents.length} PDF{documents.length !== 1 ? 's' : ''}</span>
+              <ChevronRight className="w-3 h-3" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="h-[70vh] rounded-t-3xl">
+            <SheetHeader className="pb-4">
+              <SheetTitle className="flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-primary" />
+                Material de Estudo
+              </SheetTitle>
+            </SheetHeader>
+
+            {/* Upload area in sheet */}
+            <div
+              onClick={handleAttachClick}
+              className="border-2 border-dashed rounded-xl p-4 mb-4 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all"
+            >
+              {isUploading ? (
+                <div className="space-y-2">
+                  <Loader2 className="w-6 h-6 mx-auto text-primary animate-spin" />
+                  <p className="text-sm">Processando...</p>
+                  <Progress value={uploadProgress} className="h-1" />
                 </div>
-                <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
-                  <Sparkles className="w-4 h-4 text-white" />
+              ) : (
+                <>
+                  <Upload className="w-6 h-6 mx-auto text-muted-foreground mb-2" />
+                  <p className="text-sm font-medium">Adicionar PDF</p>
+                  <p className="text-xs text-muted-foreground">Toque para selecionar</p>
+                </>
+              )}
+            </div>
+
+            {uploadError && (
+              <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                <p className="text-sm text-destructive flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  {uploadError}
+                </p>
+              </div>
+            )}
+
+            {/* Documents list */}
+            <ScrollArea className="flex-1 -mx-6 px-6">
+              {documents.length === 0 ? (
+                <div className="text-center py-8">
+                  <FileText className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
+                  <p className="text-muted-foreground">Nenhum documento</p>
+                  <p className="text-sm text-muted-foreground/70">
+                    Adicione PDFs para começar
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {documents.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 group"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shrink-0">
+                        <FileText className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{doc.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(doc.content.length / 1000).toFixed(0)}k caracteres
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => removeDocument(doc.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </SheetContent>
+        </Sheet>
+      </div>
+
+      {/* Chat Messages */}
+      <ScrollArea className="flex-1 p-3 md:p-6" ref={scrollRef}>
+        <div className="max-w-3xl mx-auto space-y-4 md:space-y-6">
+          {messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-6 md:py-12 text-center px-2">
+              {/* Hero Icon */}
+              <div className="relative mb-6">
+                <div className="w-20 h-20 md:w-24 md:h-24 rounded-2xl md:rounded-3xl bg-gradient-to-br from-primary via-emerald-500 to-cyan-500 flex items-center justify-center shadow-2xl shadow-primary/30">
+                  <Bot className="w-10 h-10 md:w-12 md:h-12 text-white" />
+                </div>
+                <div className="absolute -top-1 -right-1 w-6 h-6 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
+                  <Sparkles className="w-3 h-3 md:w-4 md:h-4 text-white" />
                 </div>
               </div>
 
               {/* Title */}
-              <h1 className="text-3xl md:text-4xl font-bold mb-3">
+              <h1 className="text-2xl md:text-4xl font-bold mb-2">
                 <span className="gradient-text">Olá! Sou o VetAI</span>
               </h1>
-              <p className="text-muted-foreground text-lg mb-8 max-w-md">
-                Seu assistente veterinário inteligente, pronto para ajudar com suas dúvidas.
+              <p className="text-muted-foreground text-sm md:text-lg mb-6 max-w-md">
+                Seu assistente veterinário inteligente
               </p>
 
-              {/* Status Cards */}
+              {/* Upload CTA - More prominent */}
               {documents.length === 0 ? (
-                <Card className="p-6 mb-8 max-w-md w-full border-dashed border-2 bg-card/50">
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30 flex items-center justify-center">
-                      <FileText className="w-7 h-7 text-blue-600 dark:text-blue-400" />
+                <div
+                  onClick={handleAttachClick}
+                  className="w-full max-w-sm p-6 rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 cursor-pointer hover:bg-primary/10 hover:border-primary/50 transition-all mb-6"
+                >
+                  {isUploading ? (
+                    <div className="space-y-3">
+                      <Loader2 className="w-10 h-10 mx-auto text-primary animate-spin" />
+                      <p className="text-sm font-medium">Processando PDF...</p>
+                      <Progress value={uploadProgress} className="h-1.5" />
                     </div>
-                    <div className="text-center">
-                      <p className="font-semibold mb-1">Nenhum documento carregado</p>
+                  ) : (
+                    <>
+                      <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-primary/20 to-emerald-500/20 flex items-center justify-center mb-3">
+                        <Upload className="w-7 h-7 text-primary" />
+                      </div>
+                      <p className="font-semibold mb-1">Comece enviando um PDF</p>
                       <p className="text-sm text-muted-foreground">
-                        Faça upload de seus slides em PDF na barra lateral para começar
+                        Toque aqui ou arraste um arquivo
                       </p>
-                    </div>
-                  </div>
-                </Card>
+                    </>
+                  )}
+                </div>
               ) : (
-                <Card className="p-4 mb-8 max-w-md w-full bg-gradient-to-r from-emerald-50 to-cyan-50 dark:from-emerald-900/20 dark:to-cyan-900/20 border-emerald-200 dark:border-emerald-800">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                      <FileText className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                <Card className="p-4 mb-6 max-w-sm w-full bg-gradient-to-r from-emerald-50 to-cyan-50 dark:from-emerald-900/20 dark:to-cyan-900/20 border-emerald-200 dark:border-emerald-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center">
+                      <CheckCircle2 className="w-5 h-5 text-white" />
                     </div>
-                    <div>
-                      <p className="font-semibold text-emerald-700 dark:text-emerald-400">
-                        {documents.length} documento{documents.length > 1 ? 's' : ''} carregado{documents.length > 1 ? 's' : ''}
+                    <div className="flex-1">
+                      <p className="font-semibold text-emerald-700 dark:text-emerald-400 text-sm">
+                        {documents.length} PDF{documents.length > 1 ? 's' : ''} carregado{documents.length > 1 ? 's' : ''}
                       </p>
-                      <p className="text-sm text-emerald-600/70 dark:text-emerald-400/70">
-                        Pronto para responder suas perguntas!
+                      <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70">
+                        Pronto para responder!
                       </p>
                     </div>
                   </div>
                 </Card>
               )}
 
+              {uploadError && (
+                <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 max-w-sm w-full">
+                  <p className="text-sm text-destructive flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    {uploadError}
+                  </p>
+                </div>
+              )}
+
               {/* Features Grid */}
               {documents.length === 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 w-full max-w-2xl">
+                <div className="grid grid-cols-3 gap-2 md:gap-4 mb-6 w-full max-w-sm md:max-w-lg">
                   {features.map((feature, i) => (
-                    <Card key={i} className="p-4 text-center hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-card/80">
-                      <div className="w-10 h-10 mx-auto rounded-xl bg-primary/10 flex items-center justify-center mb-3">
-                        <feature.icon className="w-5 h-5 text-primary" />
+                    <div key={i} className="p-3 md:p-4 text-center rounded-xl bg-card/80 border">
+                      <div className="w-8 h-8 md:w-10 md:h-10 mx-auto rounded-lg bg-primary/10 flex items-center justify-center mb-2">
+                        <feature.icon className="w-4 h-4 md:w-5 md:h-5 text-primary" />
                       </div>
-                      <p className="font-medium text-sm">{feature.title}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{feature.description}</p>
-                    </Card>
+                      <p className="font-medium text-xs md:text-sm">{feature.title}</p>
+                      <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5 hidden md:block">{feature.description}</p>
+                    </div>
                   ))}
                 </div>
               )}
 
               {/* Suggested Questions */}
               {documents.length > 0 && (
-                <div className="w-full max-w-lg space-y-3">
-                  <p className="text-sm text-muted-foreground font-medium flex items-center justify-center gap-2">
-                    <Sparkles className="w-4 h-4" />
-                    Sugestões de perguntas
+                <div className="w-full max-w-md space-y-3">
+                  <p className="text-xs text-muted-foreground font-medium flex items-center justify-center gap-1">
+                    <Sparkles className="w-3 h-3" />
+                    Sugestões
                   </p>
-                  <div className="grid gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     {suggestedQuestions.map((question, i) => (
                       <Button
                         key={i}
                         variant="outline"
-                        className="justify-start text-left h-auto py-3 px-4 hover:bg-primary/5 hover:border-primary/30 hover:shadow-md transition-all duration-200 group"
+                        className="justify-start text-left h-auto py-2.5 px-3 hover:bg-primary/5 hover:border-primary/30 transition-all text-xs"
                         onClick={() => {
                           setInput(question.text);
                           textareaRef.current?.focus();
                         }}
                       >
-                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center mr-3 group-hover:bg-primary/20 transition-colors">
-                          <question.icon className="w-4 h-4 text-primary" />
-                        </div>
-                        <span className="text-sm">{question.text}</span>
+                        <question.icon className="w-3.5 h-3.5 mr-2 text-primary shrink-0" />
+                        <span className="truncate">{question.text}</span>
                       </Button>
                     ))}
                   </div>
@@ -235,12 +488,12 @@ export function ChatInterface({
             messages.map((message) => (
               <div
                 key={message.id}
-                className={`flex gap-3 md:gap-4 message-animate ${
+                className={`flex gap-2 md:gap-4 message-animate ${
                   message.role === "user" ? "flex-row-reverse" : ""
                 }`}
               >
                 <Avatar
-                  className={`w-10 h-10 shrink-0 rounded-xl ${
+                  className={`w-8 h-8 md:w-10 md:h-10 shrink-0 rounded-lg md:rounded-xl ${
                     message.role === "assistant"
                       ? "bg-gradient-to-br from-primary to-emerald-600 shadow-lg shadow-primary/20"
                       : "bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800"
@@ -248,14 +501,14 @@ export function ChatInterface({
                 >
                   <div className="flex items-center justify-center w-full h-full">
                     {message.role === "assistant" ? (
-                      <Bot className="w-5 h-5 text-white" />
+                      <Bot className="w-4 h-4 md:w-5 md:h-5 text-white" />
                     ) : (
-                      <User className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+                      <User className="w-4 h-4 md:w-5 md:h-5 text-slate-600 dark:text-slate-300" />
                     )}
                   </div>
                 </Avatar>
                 <Card
-                  className={`flex-1 p-4 shadow-sm ${
+                  className={`flex-1 p-3 md:p-4 shadow-sm max-w-[85%] md:max-w-none ${
                     message.role === "user"
                       ? "bg-gradient-to-r from-primary to-emerald-600 text-white border-0"
                       : "bg-card"
@@ -264,7 +517,7 @@ export function ChatInterface({
                   <p className="whitespace-pre-wrap text-sm leading-relaxed">
                     {message.content}
                   </p>
-                  <span className={`text-xs mt-3 block ${
+                  <span className={`text-[10px] md:text-xs mt-2 block ${
                     message.role === "user" ? "text-white/70" : "text-muted-foreground"
                   }`}>
                     {message.timestamp.toLocaleTimeString("pt-BR", {
@@ -279,21 +532,21 @@ export function ChatInterface({
 
           {/* Loading State */}
           {isLoading && (
-            <div className="flex gap-4 message-animate">
-              <Avatar className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-emerald-600 shadow-lg shadow-primary/20 shrink-0">
+            <div className="flex gap-2 md:gap-4 message-animate">
+              <Avatar className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-gradient-to-br from-primary to-emerald-600 shadow-lg shadow-primary/20 shrink-0">
                 <div className="flex items-center justify-center w-full h-full">
-                  <Bot className="w-5 h-5 text-white" />
+                  <Bot className="w-4 h-4 md:w-5 md:h-5 text-white" />
                 </div>
               </Avatar>
-              <Card className="p-4 bg-card">
-                <div className="flex items-center gap-3">
-                  <div className="flex gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-primary typing-dot" />
-                    <span className="w-2.5 h-2.5 rounded-full bg-primary typing-dot" />
-                    <span className="w-2.5 h-2.5 rounded-full bg-primary typing-dot" />
+              <Card className="p-3 md:p-4 bg-card">
+                <div className="flex items-center gap-2">
+                  <div className="flex gap-1">
+                    <span className="w-2 h-2 rounded-full bg-primary typing-dot" />
+                    <span className="w-2 h-2 rounded-full bg-primary typing-dot" />
+                    <span className="w-2 h-2 rounded-full bg-primary typing-dot" />
                   </div>
-                  <span className="text-sm text-muted-foreground">
-                    Analisando seu material...
+                  <span className="text-xs md:text-sm text-muted-foreground">
+                    Analisando...
                   </span>
                 </div>
               </Card>
@@ -302,26 +555,40 @@ export function ChatInterface({
 
           {/* Error State */}
           {error && (
-            <div className="flex items-center gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/20 message-animate">
-              <div className="w-10 h-10 rounded-xl bg-destructive/20 flex items-center justify-center shrink-0">
-                <AlertCircle className="w-5 h-5 text-destructive" />
-              </div>
-              <div>
-                <p className="font-medium text-destructive text-sm">Erro ao processar</p>
-                <p className="text-sm text-destructive/80">{error}</p>
-              </div>
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20 message-animate">
+              <AlertCircle className="w-4 h-4 text-destructive shrink-0" />
+              <p className="text-sm text-destructive">{error}</p>
             </div>
           )}
         </div>
       </ScrollArea>
 
       {/* Input Area */}
-      <div className="border-t glass p-4 md:p-6">
-        <form
-          onSubmit={handleSubmit}
-          className="max-w-3xl mx-auto"
-        >
-          <div className="flex gap-3 items-end">
+      <div className="border-t glass p-3 md:p-4">
+        <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
+          {/* Uploading indicator */}
+          {isUploading && (
+            <div className="mb-2 p-2 rounded-lg bg-primary/10 flex items-center gap-2">
+              <Loader2 className="w-4 h-4 text-primary animate-spin" />
+              <span className="text-xs text-primary flex-1">Processando PDF...</span>
+              <Progress value={uploadProgress} className="w-20 h-1" />
+            </div>
+          )}
+
+          <div className="flex gap-2 items-end">
+            {/* Attach button */}
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-11 w-11 md:h-12 md:w-12 rounded-xl shrink-0"
+              onClick={handleAttachClick}
+              disabled={isUploading}
+            >
+              <Paperclip className="w-5 h-5" />
+            </Button>
+
+            {/* Input */}
             <div className="flex-1 relative">
               <Textarea
                 ref={textareaRef}
@@ -330,17 +597,19 @@ export function ChatInterface({
                 onKeyDown={handleKeyDown}
                 placeholder={
                   documents.length > 0
-                    ? "Digite sua pergunta sobre o material..."
-                    : "Faça upload de um PDF primeiro..."
+                    ? "Pergunte sobre o material..."
+                    : "Envie um PDF para começar..."
                 }
-                className="min-h-[56px] max-h-[200px] resize-none pr-4 rounded-xl bg-background shadow-sm border-2 focus:border-primary transition-colors"
+                className="min-h-[44px] md:min-h-[48px] max-h-[120px] resize-none rounded-xl bg-background shadow-sm border-2 focus:border-primary transition-colors text-sm"
                 disabled={isLoading}
               />
             </div>
+
+            {/* Send button */}
             <Button
               type="submit"
               size="icon"
-              className="h-14 w-14 rounded-xl bg-gradient-to-r from-primary to-emerald-600 hover:from-primary/90 hover:to-emerald-600/90 shadow-lg shadow-primary/25 transition-all hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5"
+              className="h-11 w-11 md:h-12 md:w-12 rounded-xl bg-gradient-to-r from-primary to-emerald-600 hover:from-primary/90 hover:to-emerald-600/90 shadow-lg shadow-primary/25 shrink-0"
               disabled={isLoading || !input.trim()}
             >
               {isLoading ? (
@@ -353,23 +622,19 @@ export function ChatInterface({
 
           {/* Helper Text */}
           {!apiKey && (
-            <div className="mt-3 text-center">
+            <div className="mt-2 text-center">
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 onClick={onNeedApiKey}
-                className="text-primary hover:text-primary/80"
+                className="text-primary hover:text-primary/80 text-xs h-8"
               >
-                <Sparkles className="w-4 h-4 mr-2" />
-                Configure sua API Key para começar
+                <Sparkles className="w-3 h-3 mr-1" />
+                Configure sua API Key
               </Button>
             </div>
           )}
-
-          <p className="text-xs text-center text-muted-foreground mt-3">
-            Pressione Enter para enviar ou Shift+Enter para nova linha
-          </p>
         </form>
       </div>
     </div>
