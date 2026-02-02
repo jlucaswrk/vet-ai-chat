@@ -1,23 +1,25 @@
 # VetAI - Assistente Veterinário Inteligente
 
-Uma aplicação de chat com IA que responde perguntas veterinárias baseadas em conteúdo de slides em PDF.
+Uma aplicação de chat com IA que responde perguntas veterinárias baseadas em conteúdo de documentos (PDF, PowerPoint, Word).
 
 ## Funcionalidades
 
-- **Upload de PDF**: Carregue seus slides de aulas veterinárias
+- **Upload de Documentos**: Carregue PDFs, PowerPoint e Word
 - **Chat com IA**: Faça perguntas sobre o conteúdo dos slides
 - **Respostas Contextuais**: A IA responde baseada no material carregado
-- **Interface Responsiva**: Funciona em desktop e mobile
+- **Interface Responsiva**: Funciona em desktop e mobile (mobile-first)
 - **Modo Escuro/Claro**: Tema adaptável às suas preferências
+- **Arquivos Grandes**: Suporte a arquivos até 50MB via DigitalOcean
 
 ## Tecnologias
 
-- **Next.js 14** - Framework React
+- **Next.js 15** - Framework React
 - **TypeScript** - Tipagem estática
 - **Tailwind CSS** - Estilização
 - **Shadcn/ui** - Componentes de UI
 - **OpenAI GPT-4o-mini** - Modelo de IA
-- **pdf-parse** - Extração de texto de PDFs
+- **officeparser** - Extração de texto de PDF, PPTX, DOCX
+- **DigitalOcean App Platform** - Processamento de arquivos grandes
 
 ## Instalação Local
 
@@ -50,7 +52,18 @@ Você pode obter sua API key da OpenAI em:
 
 ## Deploy na Vercel
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/seu-usuario/vet-ai-chat)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/jlucaswrk/vet-ai-chat)
+
+## Deploy do File Processor (DigitalOcean) - Para arquivos > 4MB
+
+1. Acesse https://cloud.digitalocean.com/apps/new
+2. Conecte o repositório `jlucaswrk/vet-file-processor`
+3. Mantenha as configurações padrão (Node.js será detectado)
+4. Após deploy, copie a URL gerada (ex: `https://vet-file-processor-xxxxx.ondigitalocean.app`)
+5. No Vercel, adicione a variável de ambiente:
+   ```
+   NEXT_PUBLIC_FILE_PROCESSOR_URL=https://sua-url.ondigitalocean.app
+   ```
 
 ## Licença
 

@@ -98,8 +98,13 @@ export function ChatInterface({
         return;
       }
 
-      if (file.size > MAX_FILE_SIZE) {
-        setUploadError(`Arquivo muito grande (${formatFileSize(file.size)}). Máximo: 50MB`);
+      // Check file size limits based on available services
+      const hasExternalProcessor = !!FILE_PROCESSOR_URL;
+      const effectiveMaxSize = hasExternalProcessor ? MAX_FILE_SIZE : VERCEL_SIZE_LIMIT;
+
+      if (file.size > effectiveMaxSize) {
+        const maxSizeMB = hasExternalProcessor ? '50MB' : '4MB';
+        setUploadError(`Arquivo muito grande (${formatFileSize(file.size)}). Máximo: ${maxSizeMB}`);
         return;
       }
 
