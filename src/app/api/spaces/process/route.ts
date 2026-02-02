@@ -23,17 +23,44 @@ export async function POST(request: NextRequest) {
     console.log(`Downloaded ${buffer.length} bytes from Spaces`);
 
     // Extract text using officeparser
-    const content = await new Promise<string>((resolve, reject) => {
-      officeParser.parseOffice(buffer, (err: Error | null, data: string) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(data || '');
-        }
-      });
-    });
+    let extractedText = '';
 
-    if (!content || content.trim().length === 0) {
+    try {
+      const result = await officeParser.parseOffice(buffer);
+
+      // Extract text from AST result
+      if (typeof result === 'string') {
+        extractedText = result;
+      } else if (result && typeof result === 'object') {
+        // Handle AST format
+        if ('text' in result) {
+          extractedText = String(result.text);
+        } else if ('body' in result) {
+          extractedText = String(result.body);
+        } else {
+          extractedText = JSON.stringify(result);
+        }
+      }
+
+      // Clean the text
+      if (extractedText) {
+        extractedText = extractedText
+          .replace(/\r\n/g, '\n')
+          .replace(/\r/g, '\n')
+          .replace(/\n{3,}/g, '\n\n')
+          .replace(/[ \t]+/g, ' ')
+          .trim();
+      }
+    } catch (parseError) {
+      console.error('Parse error:', parseError);
+      await deleteFile(fileKey).catch(console.error);
+      return NextResponse.json(
+        { error: 'Erro ao processar arquivo. Verifique se não está corrompido.' },
+        { status: 400 }
+      );
+    }
+
+    if (!extractedText || extractedText.trim().length < 10) {
       // Clean up the file if extraction failed
       await deleteFile(fileKey).catch(console.error);
 
@@ -43,7 +70,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`Extracted ${content.length} characters from ${filename}`);
+    console.log(`Extracted ${extractedText.length} characters from ${filename}`);
 
     // Optionally delete the file after processing (to save storage)
     // Uncomment if you don't need to keep files:
@@ -52,7 +79,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       name: filename,
-      content: content,
+      content: extractedText,
       fileKey: fileKey,
     });
 
