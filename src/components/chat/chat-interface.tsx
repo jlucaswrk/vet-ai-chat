@@ -74,16 +74,28 @@ export function ChatInterface({
   };
 
   const ALLOWED_EXTENSIONS = ['.pdf', '.pptx', '.ppt', '.docx', '.doc'];
+  const MAX_FILE_SIZE = 4.5 * 1024 * 1024; // 4.5MB - Vercel limit
 
   const isAllowedFile = (filename: string): boolean => {
     const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
     return ALLOWED_EXTENSIONS.includes(ext);
   };
 
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
   const handleFileUpload = useCallback(
     async (file: File) => {
       if (!isAllowedFile(file.name)) {
         setUploadError('Use: PDF, PowerPoint ou Word');
+        return;
+      }
+
+      if (file.size > MAX_FILE_SIZE) {
+        setUploadError(`Arquivo muito grande (${formatFileSize(file.size)}). Máximo: 4.5MB`);
         return;
       }
 
