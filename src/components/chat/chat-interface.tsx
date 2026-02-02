@@ -74,7 +74,11 @@ export function ChatInterface({
   };
 
   const ALLOWED_EXTENSIONS = ['.pdf', '.pptx', '.ppt', '.docx', '.doc'];
-  const MAX_FILE_SIZE = 4.5 * 1024 * 1024; // 4.5MB - Vercel limit
+  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB - DigitalOcean limit
+  const VERCEL_SIZE_LIMIT = 4 * 1024 * 1024; // 4MB - Use DO for larger files
+
+  // DigitalOcean App Platform URL - will be updated after deployment
+  const FILE_PROCESSOR_URL = process.env.NEXT_PUBLIC_FILE_PROCESSOR_URL || '';
 
   const isAllowedFile = (filename: string): boolean => {
     const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
@@ -95,7 +99,7 @@ export function ChatInterface({
       }
 
       if (file.size > MAX_FILE_SIZE) {
-        setUploadError(`Arquivo muito grande (${formatFileSize(file.size)}). Máximo: 4.5MB`);
+        setUploadError(`Arquivo muito grande (${formatFileSize(file.size)}). Máximo: 50MB`);
         return;
       }
 
@@ -111,7 +115,13 @@ export function ChatInterface({
         const formData = new FormData();
         formData.append("file", file);
 
-        const response = await fetch("/api/upload", {
+        // Use DigitalOcean for large files, Vercel for small files
+        const useDigitalOcean = file.size > VERCEL_SIZE_LIMIT && FILE_PROCESSOR_URL;
+        const uploadUrl = useDigitalOcean
+          ? `${FILE_PROCESSOR_URL}/process`
+          : "/api/upload";
+
+        const response = await fetch(uploadUrl, {
           method: "POST",
           body: formData,
         });

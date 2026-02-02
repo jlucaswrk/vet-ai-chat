@@ -3,6 +3,9 @@ import officeParser from 'officeparser';
 
 export const runtime = 'nodejs';
 
+// Increase body size limit to 10MB
+export const maxDuration = 60; // 60 seconds timeout
+
 const ALLOWED_EXTENSIONS = ['.pdf', '.pptx', '.ppt', '.docx', '.doc'];
 
 function getFileExtension(filename: string): string {

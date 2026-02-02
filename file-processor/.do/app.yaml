@@ -1,0 +1,16 @@
+name: vet-ai-file-processor
+region: nyc
+services:
+  - name: api
+    source_dir: /file-processor
+    github:
+      repo: jlucaswrk/vet-ai-chat
+      branch: main
+      deploy_on_push: true
+    run_command: npm start
+    environment_slug: node-js
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    http_port: 8080
+    routes:
+      - path: /
