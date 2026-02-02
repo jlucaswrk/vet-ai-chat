@@ -3,17 +3,13 @@
 import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
 import {
@@ -40,6 +36,10 @@ import {
   BookOpen,
   Loader2,
   Github,
+  Sparkles,
+  Shield,
+  ExternalLink,
+  Heart,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { PDFDocument } from "@/lib/types";
@@ -77,7 +77,6 @@ export function Sidebar({
       setUploadError(null);
 
       try {
-        // Simulate progress
         const progressInterval = setInterval(() => {
           setUploadProgress((prev) => Math.min(prev + 10, 90));
         }, 100);
@@ -151,59 +150,79 @@ export function Sidebar({
   };
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-gradient-to-b from-card to-background">
       {/* Header */}
-      <div className="p-6 border-b">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Stethoscope className="w-5 h-5 text-primary" />
+      <div className="p-6">
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-emerald-600 flex items-center justify-center shadow-lg shadow-primary/25">
+              <Stethoscope className="w-6 h-6 text-white" />
+            </div>
+            <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-400 border-2 border-card" />
           </div>
           <div>
-            <h1 className="font-bold text-lg gradient-text">VetAI</h1>
-            <p className="text-xs text-muted-foreground">
-              Assistente Veterinário
+            <h1 className="font-bold text-xl tracking-tight">
+              <span className="gradient-text">VetAI</span>
+            </h1>
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <Sparkles className="w-3 h-3" />
+              Assistente Inteligente
             </p>
           </div>
         </div>
       </div>
 
+      <Separator />
+
       <ScrollArea className="flex-1 px-4 py-6">
         {/* API Key Section */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-3">
-            <Key className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm font-medium">OpenAI API Key</span>
+            <div className="w-6 h-6 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+              <Key className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <span className="text-sm font-semibold">API Key</span>
           </div>
-          <Card className="bg-muted/50">
-            <CardContent className="p-3">
+
+          <Card className="overflow-hidden border-0 shadow-sm bg-gradient-to-br from-muted/50 to-muted/30">
+            <CardContent className="p-4">
               {apiKey ? (
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
-                    <span className="text-sm">Configurada</span>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Conectada</p>
+                      <p className="text-xs text-muted-foreground">OpenAI GPT-4</p>
+                    </div>
                   </div>
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="icon"
                     onClick={handleRemoveApiKey}
-                    className="h-8 text-destructive hover:text-destructive"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
               ) : (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <XCircle className="w-4 h-4 text-destructive" />
-                    <span className="text-sm">Não configurada</span>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                      <XCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Não configurada</p>
+                      <p className="text-xs text-muted-foreground">Necessário para usar</p>
+                    </div>
                   </div>
                   <Button
-                    variant="outline"
-                    size="sm"
                     onClick={() => onShowApiKeyDialogChange(true)}
-                    className="h-8"
+                    className="w-full bg-gradient-to-r from-primary to-emerald-600 hover:from-primary/90 hover:to-emerald-600/90 shadow-md shadow-primary/20"
                   >
-                    Configurar
+                    <Key className="w-4 h-4 mr-2" />
+                    Configurar API Key
                   </Button>
                 </div>
               )}
@@ -211,114 +230,141 @@ export function Sidebar({
           </Card>
         </div>
 
-        <Separator className="mb-6" />
-
         {/* Upload Section */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-3">
-            <BookOpen className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Material de Estudo</span>
+            <div className="w-6 h-6 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+              <BookOpen className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <span className="text-sm font-semibold">Material de Estudo</span>
           </div>
 
           <div
             {...getRootProps()}
             className={`
-              border-2 border-dashed rounded-lg p-6 text-center cursor-pointer
-              transition-all duration-200
+              relative overflow-hidden rounded-xl border-2 border-dashed p-6 text-center cursor-pointer
+              transition-all duration-300 group
               ${
                 isDragActive
-                  ? "border-primary bg-primary/5"
+                  ? "border-primary bg-primary/5 scale-[1.02]"
                   : "border-border hover:border-primary/50 hover:bg-muted/50"
               }
-              ${isUploading ? "pointer-events-none opacity-60" : ""}
+              ${isUploading ? "pointer-events-none" : ""}
             `}
           >
             <input {...getInputProps()} />
+
+            {/* Background decoration */}
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+
             {isUploading ? (
-              <div className="space-y-3">
-                <Loader2 className="w-8 h-8 mx-auto text-primary animate-spin" />
-                <p className="text-sm text-muted-foreground">
-                  Processando PDF...
-                </p>
-                <Progress value={uploadProgress} className="h-2" />
+              <div className="relative space-y-4">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <Loader2 className="w-7 h-7 text-primary animate-spin" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Processando PDF...</p>
+                  <p className="text-xs text-muted-foreground mt-1">Extraindo conteúdo</p>
+                </div>
+                <Progress value={uploadProgress} className="h-1.5" />
               </div>
             ) : (
-              <>
-                <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-3" />
-                <p className="text-sm text-muted-foreground">
-                  {isDragActive
-                    ? "Solte o arquivo aqui..."
-                    : "Arraste um PDF ou clique para selecionar"}
-                </p>
-              </>
+              <div className="relative space-y-3">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Upload className="w-7 h-7 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">
+                    {isDragActive ? "Solte o arquivo aqui" : "Upload de PDF"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Arraste ou clique para selecionar
+                  </p>
+                </div>
+              </div>
             )}
           </div>
 
           {uploadError && (
-            <p className="text-sm text-destructive mt-2 flex items-center gap-1">
-              <XCircle className="w-4 h-4" />
-              {uploadError}
-            </p>
+            <div className="mt-3 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+              <p className="text-sm text-destructive flex items-center gap-2">
+                <XCircle className="w-4 h-4 shrink-0" />
+                {uploadError}
+              </p>
+            </div>
           )}
         </div>
 
         {/* Documents List */}
         {documents.length > 0 && (
           <div className="space-y-3">
-            <span className="text-sm font-medium text-muted-foreground">
-              Documentos Carregados ({documents.length})
-            </span>
-            {documents.map((doc) => (
-              <Card key={doc.id} className="bg-muted/30">
-                <CardContent className="p-3">
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center shrink-0">
-                      <FileText className="w-4 h-4 text-primary" />
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold">Documentos</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                {documents.length}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {documents.map((doc) => (
+                <Card key={doc.id} className="group overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-200 bg-gradient-to-r from-card to-muted/30">
+                  <CardContent className="p-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-100 to-purple-100 dark:from-violet-900/30 dark:to-purple-900/30 flex items-center justify-center shrink-0">
+                        <FileText className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{doc.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(doc.content.length / 1000).toFixed(1)}k caracteres
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+                        onClick={() => removeDocument(doc.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{doc.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {(doc.content.length / 1000).toFixed(1)}k caracteres
-                      </p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
-                      onClick={() => removeDocument(doc.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
         )}
       </ScrollArea>
 
       {/* Footer */}
-      <div className="p-4 border-t mt-auto">
+      <div className="p-4 border-t bg-muted/30">
         <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          >
-            {theme === "dark" ? (
-              <Sun className="w-5 h-5" />
-            ) : (
-              <Moon className="w-5 h-5" />
-            )}
-          </Button>
-          <a
-            href="https://github.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Github className="w-5 h-5" />
-          </a>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="h-9 w-9 rounded-xl"
+            >
+              {theme === "dark" ? (
+                <Sun className="w-4 h-4" />
+              ) : (
+                <Moon className="w-4 h-4" />
+              )}
+            </Button>
+            <a
+              href="https://github.com/jlucaswrk/vet-ai-chat"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl">
+                <Github className="w-4 h-4" />
+              </Button>
+            </a>
+          </div>
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
+            Feito com <Heart className="w-3 h-3 text-red-500 fill-red-500" />
+          </p>
         </div>
       </div>
     </div>
@@ -327,7 +373,7 @@ export function Sidebar({
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-80 border-r bg-card h-screen flex-col">
+      <aside className="hidden md:flex w-80 border-r h-screen flex-col">
         <SidebarContent />
       </aside>
 
@@ -335,9 +381,9 @@ export function Sidebar({
       <Sheet>
         <SheetTrigger asChild>
           <Button
-            variant="ghost"
+            variant="outline"
             size="icon"
-            className="md:hidden fixed top-4 left-4 z-50"
+            className="md:hidden fixed top-4 left-4 z-50 h-10 w-10 rounded-xl shadow-lg bg-card/80 backdrop-blur-sm"
           >
             <Menu className="w-5 h-5" />
           </Button>
@@ -348,49 +394,67 @@ export function Sidebar({
       </Sheet>
 
       {/* API Key Dialog */}
-      <Dialog
-        open={showApiKeyDialog}
-        onOpenChange={onShowApiKeyDialogChange}
-      >
-        <DialogContent>
+      <Dialog open={showApiKeyDialog} onOpenChange={onShowApiKeyDialogChange}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Configurar OpenAI API Key</DialogTitle>
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 flex items-center justify-center mb-2">
+              <Key className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+            </div>
+            <DialogTitle className="text-xl">Configurar API Key</DialogTitle>
             <DialogDescription>
-              Insira sua chave de API da OpenAI para usar o assistente
-              veterinário. A chave será salva localmente no seu navegador.
+              Insira sua chave da OpenAI para habilitar o assistente veterinário.
             </DialogDescription>
           </DialogHeader>
+
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="apiKey">API Key</Label>
+              <Label htmlFor="apiKey" className="text-sm font-medium">
+                Chave de API
+              </Label>
               <Input
                 id="apiKey"
                 type="password"
-                placeholder="sk-..."
+                placeholder="sk-proj-..."
                 value={tempApiKey}
                 onChange={(e) => setTempApiKey(e.target.value)}
+                className="h-11"
               />
             </div>
-            <p className="text-xs text-muted-foreground">
-              Obtenha sua chave em{" "}
-              <a
-                href="https://platform.openai.com/api-keys"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                platform.openai.com/api-keys
-              </a>
-            </p>
+
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+              <Shield className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium">Armazenamento seguro</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Sua chave é salva apenas no seu navegador (localStorage) e nunca é enviada para nossos servidores.
+                </p>
+              </div>
+            </div>
+
+            <a
+              href="https://platform.openai.com/api-keys"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-sm text-primary hover:underline"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Obter chave em platform.openai.com
+            </a>
           </div>
-          <DialogFooter>
+
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button
               variant="outline"
               onClick={() => onShowApiKeyDialogChange(false)}
             >
               Cancelar
             </Button>
-            <Button onClick={handleSaveApiKey} disabled={!tempApiKey.trim()}>
+            <Button
+              onClick={handleSaveApiKey}
+              disabled={!tempApiKey.trim()}
+              className="bg-gradient-to-r from-primary to-emerald-600 hover:from-primary/90 hover:to-emerald-600/90"
+            >
+              <CheckCircle2 className="w-4 h-4 mr-2" />
               Salvar
             </Button>
           </DialogFooter>
